@@ -1,0 +1,83 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  psp:
+    # This mirrors exactly what was verified by hand while building this
+    # project: download pspdev's prebuilt toolchain release, cross-compile
+    # with its CMake toolchain file, pack-pbp produces a real EBOOT.PBP.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache pspdev toolchain
+        id: cache-pspdev
+        uses: actions/cache@v4
+        with:
+          path: /opt/pspdev
+          key: pspdev-v20260901-ubuntu-latest-x86_64
+
+      - name: Download pspdev toolchain
+        if: steps.cache-pspdev.outputs.cache-hit != 'true'
+        run: |
+          curl -sL "https://github.com/pspdev/pspdev/releases/download/v20260901/pspdev-ubuntu-latest-x86_64.tar.gz" -o pspdev.tar.gz
+          sudo mkdir -p /opt/pspdev
+          sudo tar -xzf pspdev.tar.gz -C /opt/pspdev --strip-components=1
+        # Bump the v20260901 tag above to track newer pspdev releases -
+        # see https://github.com/pspdev/pspdev/releases
+
+      - name: Build PSP EBOOT
+        run: |
+          export PSPDEV=/opt/pspdev
+          export PATH=$PSPDEV/bin:$PATH
+          cmake -B build-psp -DCMAKE_TOOLCHAIN_FILE=$PSPDEV/psp/share/pspdev.cmake -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-psp
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: psp-eboot
+          path: |
+            build-psp/EBOOT.PBP
+            build-psp/mtd2
+
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SDL2 (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
+
+      - name: Install SDL2 (macOS)
+        if: runner.os == 'macOS'
+        run: brew install sdl2
+
+      - name: Install SDL2 (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          curl -sL "https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-devel-2.30.9-VC.zip" -o sdl2.zip
+          7z x sdl2.zip -oC:\SDL2dev
+          echo "SDL2_DIR=C:\SDL2dev\SDL2-2.30.9\cmake" >> $env:GITHUB_ENV
+
+      - name: Configure
+        run: cmake -B build-desktop -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build-desktop --config Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            build-desktop/mtd2_desktop*
+            build-desktop/**/*.dll
+          if-no-files-found: ignore
