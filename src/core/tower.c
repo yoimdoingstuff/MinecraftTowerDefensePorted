@@ -18,6 +18,24 @@ void tower_set_init(TowerSet *ts) {
     for (int i = 0; i < TOWER_MAX_ACTIVE; i++) ts->list[i].target_enemy_id = -1;
 }
 
+const int TOWER_TIER_KILL_THRESHOLDS[TOWER_MAX_TIER - 1] = {100, 250, 500, 1000};
+
+int tower_tier_for_kills(int lifetime_kills) {
+    int tier = 1;
+    for (int i = 0; i < TOWER_MAX_TIER - 1; i++) {
+        if (lifetime_kills >= TOWER_TIER_KILL_THRESHOLDS[i]) tier = i + 2;
+    }
+    return tier;
+}
+
+float tower_tier_power_mult(int tier) {
+    return 1.0f + 0.15f * (float)(tier - 1); /* design choice, see header */
+}
+
+float tower_tier_range_mult(int tier) {
+    return 1.0f + 0.10f * (float)(tier - 1); /* design choice, see header */
+}
+
 int tower_set_occupied(const TowerSet *ts, int tx, int ty) {
     for (int i = 0; i < ts->count; i++) {
         if (ts->list[i].alive && ts->list[i].tile_x == tx && ts->list[i].tile_y == ty) return 1;

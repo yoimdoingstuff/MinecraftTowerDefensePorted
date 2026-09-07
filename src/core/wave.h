@@ -29,9 +29,14 @@ typedef struct {
     int spawned_alive;        /* enemies released but not yet dead/leaked */
     float spawn_timer;
     float spawn_interval;     /* seconds between spawns within a wave */
+
+    EnemyKind boss_kind;       /* which enemy appears as this map's boss */
+    int boss_wave;             /* wave number it appears on; 0 = no boss on this map */
+    int current_wave_is_boss;  /* set by begin_wave when wave_number == boss_wave */
 } WaveManager;
 
-void wave_manager_init(WaveManager *wm, int total_waves);
+/* boss_wave = 0 means this map has no boss wave. */
+void wave_manager_init(WaveManager *wm, int total_waves, EnemyKind boss_kind, int boss_wave);
 /* Call once the player confirms "start next wave" (or auto-start, if
  * that's how the caller wants to drive it) while state == WAVE_IDLE. */
 void wave_manager_begin_wave(WaveManager *wm);
@@ -40,8 +45,9 @@ void wave_manager_begin_wave(WaveManager *wm);
  * approximation, not an extracted per-map formula. */
 int wave_enemy_count(int wave_number);
 
-/* Simple deterministic mix of the 6-enemy starter roster so early
- * waves lean on zombies/skeletons and later ones bring in the faster
+/* Simple deterministic progression across the full 13-enemy hostile
+ * roster (Herobrine excluded - boss-only, see enemy.h) so early waves
+ * lean on the slow basics and later waves bring in faster/tougher
  * types. Not extracted - a placeholder rule to tune later. */
 EnemyKind wave_pick_enemy_kind(int wave_number, int spawn_index_in_wave);
 

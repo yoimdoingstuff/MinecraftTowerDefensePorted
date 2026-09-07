@@ -2,13 +2,15 @@
  *
  * Speeds are the real extracted values. HP follows the original's rule:
  * health = current wave number, for every enemy EXCEPT the ones marked
- * fixed_hp below (allies with flat low HP, and Herobrine as a fixed
- * 750HP boss that never appears in this starter roster).
+ * fixed_hp below. Herobrine is a fixed 750HP boss (extracted exactly)
+ * that does not scale with wave - he's handled as a special one-time
+ * spawn (see MapDef.boss_kind/boss_wave in map_data.h), not part of the
+ * normal random wave roster.
  *
- * This starter build includes the early-wave roster only (see
- * docs/original-game-reference.md for the full ~16-type list); the
- * rest are documented there and are a data-table addition away, not
- * new engine work.
+ * Two documented enemies are deliberately NOT here: Wolf (flat 2HP) and
+ * Snow Golem (flat 4HP) are allies the player can summon, not hostile
+ * wave enemies - see docs/original-game-reference.md. Implementing
+ * player-side summons is a separate mechanic, not added yet.
  */
 #ifndef MTD_ENEMY_H
 #define MTD_ENEMY_H
@@ -22,6 +24,14 @@ typedef enum {
     ENEMY_CREEPER,
     ENEMY_CAVE_SPIDER,
     ENEMY_SILVERFISH,
+    ENEMY_ZOMBIE_PIG,
+    ENEMY_BLAZE,
+    ENEMY_GHAST,
+    ENEMY_MAGMA,
+    ENEMY_SLIME,
+    ENEMY_SPIDER_JOCKEY,
+    ENEMY_ENDERMAN,
+    ENEMY_HEROBRINE,
     ENEMY_COUNT
 } EnemyKind;
 
@@ -32,7 +42,12 @@ typedef struct {
     int fixed_hp;         /* 0 = use current wave number; nonzero = always this many HP */
     int reward;           /* currency on death - only zombie's 10 is a confirmed
                               extracted value; others reuse it as a baseline until
-                              individually confirmed (see reference doc) */
+                              individually confirmed (see reference doc). Herobrine's
+                              500 is a deliberate design choice (boss payout), not
+                              extracted - there's nothing to extract since he's a
+                              one-time spawn, not a wave-pool enemy. */
+    int is_boss;           /* 1 = spawned only via MapDef.boss_kind, never in the
+                               normal random wave-enemy pool */
 } EnemyDef;
 
 extern const EnemyDef ENEMY_DEFS[ENEMY_COUNT];

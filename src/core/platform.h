@@ -48,6 +48,13 @@ void platform_clear(uint8_t r, uint8_t g, uint8_t b);
 
 void platform_draw_texture(const PlatformTexture *tex, int x, int y);
 
+/* Same as above but multiplies the texture's own colors by r,g,b
+ * (255,255,255 = no change) - used for per-map tile tinting so maps
+ * look distinct from each other without needing a full separate
+ * texture per map per tile. */
+void platform_draw_texture_tinted(const PlatformTexture *tex, int x, int y,
+                                   uint8_t r, uint8_t g, uint8_t b);
+
 /* Draws a sub-rectangle of the texture (src_x,src_y,src_w,src_h) at
  * dest x,y sized dest_w,dest_h. Used for the 40x40 tile sheets and for
  * simple stretch-to-fit UI bars. */

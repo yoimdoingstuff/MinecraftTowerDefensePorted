@@ -32,6 +32,7 @@ struct PlatformSound {
 };
 
 typedef struct { float u, v; float x, y, z; } TexVertex;
+typedef struct { float u, v; unsigned int color; float x, y, z; } TexColorVertex;
 typedef struct { unsigned int color; float x, y, z; } ColorVertex;
 
 /* ---- lifecycle / exit callback (standard PSP homebrew boilerplate) ---- */
@@ -106,6 +107,36 @@ double platform_time_seconds(void) { return (double)sceKernelGetSystemTimeWide()
 static int next_pot(int v) { int p = 1; while (p < v) p <<= 1; return p; }
 
 static const char *s_asset_root = "assets/";
+static char s_asset_root_buf[512];
+
+void psp_set_asset_base_from_argv0(const char *argv0) {
+    /* Relying on a bare relative "assets/" path assumes the current
+     * working directory is already the EBOOT's own folder. That's
+     * normal when launched from the XMB, but not guaranteed for every
+     * loader/launch method - and if it's wrong, EVERY texture/sound
+     * silently fails to load (this is almost certainly what happened
+     * testing on real hardware). argv[0] is the one thing the PSP
+     * loader reliably sets to the EBOOT's own full path regardless of
+     * how it was launched, so derive the asset root from that instead
+     * of trusting cwd. Falls back to the plain relative path (the old
+     * behavior) if that check fails, so this can't make things worse
+     * on a setup where cwd genuinely was already correct. */
+    if (!argv0) return;
+    const char *slash = strrchr(argv0, '/');
+    if (!slash) return;
+    size_t dir_len = (size_t)(slash - argv0) + 1;
+    if (dir_len + 8 >= sizeof(s_asset_root_buf)) return;
+    memcpy(s_asset_root_buf, argv0, dir_len);
+    memcpy(s_asset_root_buf + dir_len, "assets/", 8);
+
+    char probe[560];
+    snprintf(probe, sizeof probe, "%simages/tile_path.png", s_asset_root_buf);
+    FILE *f = fopen(probe, "rb");
+    if (f) {
+        fclose(f);
+        s_asset_root = s_asset_root_buf;
+    } /* else: leave s_asset_root at the "assets/" default */
+}
 
 PlatformTexture *platform_load_texture(const char *relative_path) {
     char path[512];
@@ -171,6 +202,19 @@ static void draw_tex_quad(const PlatformTexture *tex,
 void platform_draw_texture(const PlatformTexture *tex, int x, int y) {
     if (!tex) return;
     draw_tex_quad(tex, 0, 0, (float)tex->orig_w, (float)tex->orig_h, x, y, tex->orig_w, tex->orig_h);
+}
+
+void platform_draw_texture_tinted(const PlatformTexture *tex, int x, int y,
+                                   uint8_t r, uint8_t g, uint8_t b) {
+    if (!tex) return;
+    TexColorVertex *v = sceGuGetMemory(2 * sizeof(TexColorVertex));
+    unsigned int color = GU_ABGR(255, b, g, r);
+    v[0].u = 0; v[0].v = 0; v[0].color = color;
+    v[0].x = (float)x; v[0].y = (float)y; v[0].z = 0;
+    v[1].u = (float)tex->orig_w / tex->pot_w; v[1].v = (float)tex->orig_h / tex->pot_h; v[1].color = color;
+    v[1].x = (float)(x + tex->orig_w); v[1].y = (float)(y + tex->orig_h); v[1].z = 0;
+    bind_texture(tex);
+    sceGuDrawArray(GU_SPRITES, GU_TEXTURE_32BITF | GU_COLOR_8888 | GU_VERTEX_32BITF | GU_TRANSFORM_2D, 2, 0, v);
 }
 
 void platform_draw_texture_ex(const PlatformTexture *tex,

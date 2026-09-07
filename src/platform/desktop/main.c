@@ -18,6 +18,8 @@ int main(int argc, char **argv) {
 
     Game game;
     game_init(&game, map_index);
+
+
     printf("Loaded map: %s (%d waves)\n", MAP_DEFS[map_index].display_name,
            MAP_DEFS[map_index].total_waves);
     printf("Controls: arrows/WASD move, Enter/Z place, Backspace/X sell, "

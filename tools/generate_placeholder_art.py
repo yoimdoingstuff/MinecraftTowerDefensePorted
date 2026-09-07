@@ -1,16 +1,22 @@
-#!/usr/bin/env python3
-"""Generates simple original placeholder sprites for the starter build.
+"""Generates simple original placeholder sprites for enemies/towers
+that don't yet have a real matched asset from the extracted SWF.
 
-Why placeholders instead of the 422 images already extracted from the
-SWF: those decoded correctly, but most only have a generic char_<id>
-name - the *sprites* (game objects) have real export names like
-"327_arrow_dispenser", but figuring out which raw bitmap is that
-sprite's actual frame means walking its DefineSprite's PlaceObject
-chain, which hasn't been done yet (see docs/original-game-reference.md).
-Guessing would risk shipping the wrong art under the right name. These
-placeholders are clean and functional so the engine is fully playable
-now; swap them for real matched assets later without touching any
-engine code - only these file contents change.
+Status as of this pass: all 9 towers and 5 enemies (creeper, ghast,
+magma, slime, herobrine) now use REAL extracted images - resolved by
+walking each named sprite's DefineSprite/DefineShape reference chain
+to find its actual bitmap fill (see tools/ notes in
+docs/original-game-reference.md for how). This script deliberately
+does NOT regenerate tower_*.png or those 5 enemy files - only the
+enemies below that are still placeholders.
+
+Why the rest are still placeholders: zombie/skeleton/spider/
+cave_spider/silverfish/zombie_pig/blaze/spider_jockey/enderman all
+resolve to a single LIMB/fragment of a multi-part articulated
+character (Minecraft mobs are built from separately-animated body
+parts), not one flat sprite - using the raw fragment would look
+broken rather than better than a placeholder. Correctly compositing
+them needs each part's placement matrix from the parent clip, which
+wasn't done this pass.
 """
 import os
 from PIL import Image, ImageDraw
@@ -18,7 +24,18 @@ from PIL import Image, ImageDraw
 OUT = os.path.join(os.path.dirname(__file__), '..', 'assets', 'images')
 os.makedirs(OUT, exist_ok=True)
 
+REAL_ASSET_FILES = {
+    'tile_buildable.png', 'tile_path.png',  # not real, but hand-designed and fine as-is
+    'tower_egg.png', 'tower_snow.png', 'tower_arrow.png', 'tower_fireball.png',
+    'tower_slime.png', 'tower_enderpearl.png', 'tower_golden.png', 'tower_tnt.png',
+    'tower_poison.png', 'enemy_creeper.png', 'enemy_ghast.png', 'enemy_magma.png',
+    'enemy_slime.png', 'enemy_herobrine.png',
+}
+
 def save(name, img):
+    if name in REAL_ASSET_FILES:
+        print('skipping (real asset already in place):', name)
+        return
     img.save(os.path.join(OUT, name))
     print('wrote', name)
 
@@ -56,15 +73,9 @@ def tower(name, color, shape):
         d.polygon(pts, fill=color, outline=(0, 0, 0, 255))
     save(name, img)
 
-tower('tower_egg.png',        (240, 230, 200, 255), 'circle')
-tower('tower_snow.png',       (220, 245, 255, 255), 'diamond')
-tower('tower_arrow.png',      (160, 120, 70, 255),  'triangle')
-tower('tower_fireball.png',   (230, 90, 30, 255),   'circle')
-tower('tower_slime.png',      (80, 200, 90, 255),   'square')
-tower('tower_enderpearl.png', (40, 200, 190, 255),  'diamond')
-tower('tower_golden.png',     (235, 195, 40, 255),  'star')
-tower('tower_tnt.png',        (200, 40, 40, 255),   'square')
-tower('tower_poison.png',     (140, 60, 190, 255),  'diamond')
+## Towers now all use real extracted assets (see REAL_ASSET_FILES
+## above) - placeholder generation calls removed, tower() helper kept
+## in case a specific tower ever needs a placeholder again.
 
 def enemy(name, color, shape):
     img = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
@@ -85,9 +96,12 @@ def enemy(name, color, shape):
 enemy('enemy_zombie.png',      (70, 140, 70, 255),   'square')
 enemy('enemy_skeleton.png',    (225, 225, 210, 255), 'square')
 enemy('enemy_spider.png',      (60, 40, 40, 255),    'octagon')
-enemy('enemy_creeper.png',     (60, 170, 70, 255),   'square')
 enemy('enemy_cave_spider.png', (40, 90, 90, 255),    'octagon')
 enemy('enemy_silverfish.png',  (150, 150, 160, 255), 'circle')
+enemy('enemy_zombie_pig.png',   (190, 110, 110, 255), 'square')
+enemy('enemy_blaze.png',        (250, 200, 60, 255),  'circle')
+enemy('enemy_spider_jockey.png',(90, 60, 40, 255),    'octagon')
+enemy('enemy_enderman.png',     (30, 20, 40, 255),    'square')
 
 # cursor highlight (40x40, transparent center, bright border)
 img = Image.new('RGBA', (40, 40), (0, 0, 0, 0))

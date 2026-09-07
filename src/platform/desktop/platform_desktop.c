@@ -42,17 +42,39 @@ static void audio_callback(void *userdata, Uint8 *stream, int len) {
     }
 }
 
-static const char *find_asset_root(void) {
-    /* Works whether the binary is run from the build dir or the repo
-     * root - tries a couple of likely relative paths. */
+static void resolve_asset_root(void) {
+    /* Old approach guessed a handful of paths relative to the current
+     * working directory - worked when launched via `./mtd2_desktop`
+     * from inside its own folder, silently failed for any other
+     * launch method (double-click, shortcut, launched from elsewhere),
+     * since CWD isn't the executable's directory in those cases.
+     * SDL_GetBasePath() returns the real directory containing the
+     * executable on every platform, so this is correct regardless of
+     * how/from-where the program was started. */
+    char *base = SDL_GetBasePath();
+    if (base) {
+        char probe[700];
+        snprintf(probe, sizeof probe, "%sassets/images/tile_path.png", base);
+        FILE *f = fopen(probe, "rb");
+        if (f) {
+            fclose(f);
+            snprintf(s_asset_root, sizeof s_asset_root, "%sassets/", base);
+            SDL_free(base);
+            return;
+        }
+        SDL_free(base);
+    }
+    /* Fall back to the old CWD-relative guesses (covers running
+     * straight from the build directory during development). */
     static const char *candidates[] = {"assets/", "../assets/", "../../assets/"};
     for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
         char probe[600];
         snprintf(probe, sizeof probe, "%simages/tile_path.png", candidates[i]);
         FILE *f = fopen(probe, "rb");
-        if (f) { fclose(f); return candidates[i]; }
+        if (f) { fclose(f); strncpy(s_asset_root, candidates[i], sizeof(s_asset_root) - 1); return; }
     }
-    return "assets/";
+    fprintf(stderr, "[assets] could not locate the assets/ folder next to the executable "
+                     "or in the working directory - textures/sounds will fail to load.\n");
 }
 
 void platform_init(int *out_screen_w, int *out_screen_h) {
@@ -64,7 +86,8 @@ void platform_init(int *out_screen_w, int *out_screen_h) {
     SDL_RenderSetLogicalSize(s_renderer, SCREEN_W, SCREEN_H);
     SDL_SetRenderDrawBlendMode(s_renderer, SDL_BLENDMODE_BLEND);
 
-    strncpy(s_asset_root, find_asset_root(), sizeof(s_asset_root) - 1);
+    strncpy(s_asset_root, "assets/", sizeof(s_asset_root) - 1);
+    resolve_asset_root();
 
     SDL_AudioSpec want, have;
     memset(&want, 0, sizeof(want));
@@ -137,6 +160,15 @@ void platform_draw_texture(const PlatformTexture *tex, int x, int y) {
     if (!tex) return;
     SDL_Rect dst = {x, y, tex->w, tex->h};
     SDL_RenderCopy(s_renderer, tex->tex, NULL, &dst);
+}
+
+void platform_draw_texture_tinted(const PlatformTexture *tex, int x, int y,
+                                   uint8_t r, uint8_t g, uint8_t b) {
+    if (!tex) return;
+    SDL_SetTextureColorMod(tex->tex, r, g, b);
+    SDL_Rect dst = {x, y, tex->w, tex->h};
+    SDL_RenderCopy(s_renderer, tex->tex, NULL, &dst);
+    SDL_SetTextureColorMod(tex->tex, 255, 255, 255);
 }
 
 void platform_draw_texture_ex(const PlatformTexture *tex,

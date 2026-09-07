@@ -3,8 +3,10 @@
 #include "../../core/render.h"
 #include "../../core/map_data.h"
 
+void psp_set_asset_base_from_argv0(const char *argv0); /* platform_psp.c */
+
 int main(int argc, char **argv) {
-    (void)argc; (void)argv;
+    if (argc > 0 && argv[0]) psp_set_asset_base_from_argv0(argv[0]);
 
     int screen_w, screen_h;
     platform_init(&screen_w, &screen_h);

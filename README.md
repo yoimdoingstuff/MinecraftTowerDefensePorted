@@ -14,13 +14,19 @@ extracted. Quick summary of what's real vs. stand-in right now:
 | Piece | Status |
 |---|---|
 | Tower stats (cost/power/range/firerate) for all 9 dispensers | **Real**, pulled from the decompiled AS2 |
-| Enemy speeds, HP = current wave number rule | **Real**, extracted |
+| Tower art (all 9) | **Real** - resolved from the SWF's own sprite/shape data, see reference doc |
+| Enemy speeds, HP = current wave number rule, all 14 hostile types | **Real**, extracted |
+| Enemy art: creeper, ghast, magma cube, slime, Herobrine | **Real** |
+| Enemy art: the other 9 (zombie, skeleton, spider, cave_spider, silverfish, zombie_pig, blaze, spider_jockey, enderman) | **Placeholder** - these resolve to one limb of a multi-part animated character, not a full sprite; using the raw fragment would look broken, see reference doc |
 | Grid/lane mechanic (fixed path, directional tower firing, wall-blocked range) | **Real mechanic**, reimplemented from the decompiled logic |
-| Map tile layouts (Forest/Village/Ravine) | **Original layouts** - real per-map tile data wasn't extracted this pass, see reference doc |
-| Sprite art (towers/enemies/tiles) | **Original placeholders** - the 422 images extracted from the SWF decoded fine but mostly aren't matched to a specific role yet |
+| Tier 1-5 system (lifetime kills per tower type) | **Real mechanic** (arrow's thresholds), **designed stat bonus** (original's exact bonus wasn't traced) - in-memory only, doesn't persist across runs yet |
+| Map tile layouts (all 9) | **Original layouts** - real per-map tile data wasn't extracted this pass, see reference doc |
+| Per-map visual tinting | **Original** - a mood wash, not real per-map background art |
+| Herobrine boss wave (Nether Stronghold, final wave) | **Original design choice** - a boss exists in the source, but this pairing/placement is ours |
 | Sound effects (place/select/fire) | **Real**, extracted from the SWF and converted to WAV |
 | Starting currency/lives, sell refund %, wave pacing | **Reasonable defaults**, not extracted values |
 | Newgrounds medals/leaderboards, ads, cutscenes | **Intentionally dropped** - no PSP equivalent |
+| Wolf / Snow Golem allies | **Not implemented** - these are player-summonable allies in the original, a different mechanic than the hostile wave roster |
 
 None of this is locked in - swapping in real map layouts or matched
 sprite art later only touches data files (`src/core/map_data.c`,
@@ -54,7 +60,7 @@ brew install sdl2 cmake
 
 cmake -B build-desktop -DCMAKE_BUILD_TYPE=Release
 cmake --build build-desktop
-./build-desktop/mtd2_desktop        # optional arg: map index (0=Forest, 1=Village, 2=Ravine)
+./build-desktop/mtd2_desktop        # optional arg: map index, 0-8 (see docs/original-game-reference.md for the list)
 ```
 
 On Windows, grab an `SDL2-devel-*-VC.zip` from
@@ -73,14 +79,24 @@ cmake -B build-psp -DCMAKE_TOOLCHAIN_FILE=$PSPDEV/psp/share/pspdev.cmake -DCMAKE
 cmake --build build-psp
 ```
 
-Produces `build-psp/EBOOT.PBP`. Copy it (plus the `assets/` folder,
-next to it or under `ms0:/PSP/GAME/MTD2/`) to a real PSP or PPSSPP.
-**This EBOOT is confirmed to build and link cleanly against the real
-pspdev toolchain, but hasn't been run on real hardware or in an
-emulator** - there's no PSP available in the environment this was
-built in, so first boot may still turn up runtime issues (an early
-target: check for anything obviously wrong in the GU init sequence or
-texture upload before debugging gameplay logic).
+Produces `build-psp/EBOOT.PBP`. **The `assets/` folder must sit right
+next to EBOOT.PBP** - e.g. `ms0:/PSP/GAME/MTD2/EBOOT.PBP` needs
+`ms0:/PSP/GAME/MTD2/assets/` (not `assets/` anywhere else under
+`PSP/GAME/`, specifically alongside that EBOOT). The game finds its own
+assets by asking the OS for the full path it was launched from and
+looking next to that (via `argv[0]`), not by assuming the working
+directory is already correct.
+
+**Status: tested on real PSP hardware once, and assets failed to
+load.** That's what the argv[0] fix above addresses - the previous
+version assumed the working directory was already the EBOOT's folder,
+which isn't guaranteed for every launch method. This fix hasn't been
+re-confirmed on hardware yet (that needs another test pass), so treat
+it as the most likely fix based on the code, not a verified one. If
+assets still don't show up after this, the folder placement above is
+the next thing to double check, followed by actually reporting back
+what's on screen (crash / black screen / tiles but no sprites / etc) so
+the next fix can target the real cause instead of guessing again.
 
 ### GitHub Actions
 
@@ -111,11 +127,16 @@ header - none of the game logic changes.
 
 - Real per-map tile layouts (the actual Forest/Village/etc. corridors,
   not the original stand-ins here)
-- Matching specific extracted sprites to specific towers/enemies
-  (needs walking each sprite's `DefineSprite` placement chain - the
-  raw images are already sitting in `assets/images/`)
-- The other ~10 enemy types and ~13 maps documented but not yet wired
-  up (`docs/original-game-reference.md` has full stats for all of them)
-- The permanent lifetime-kills tower tier system (1-5, cosmetic +
-  likely a stat bonus) isn't implemented
-- No PSP hardware/emulator testing yet (see above)
+- Compositing the 9 articulated-character enemies (zombie, skeleton,
+  spider, cave_spider, silverfish, zombie_pig, blaze, spider_jockey,
+  enderman) from their real limb pieces instead of using placeholder
+  art - needs each part's placement matrix from the parent clip, see
+  reference doc
+- The 3 "classic" maps and a few other named locations documented but
+  not yet wired up (`docs/original-game-reference.md`)
+- Wolf / Snow Golem player-summonable allies - a mechanic, not just a
+  data entry
+- Persisting the tier system's kill counts across runs (needs a save
+  file - not the same problem on PSP vs. desktop, hasn't been designed)
+- Fix confirmation for the PSP asset-loading bug (see PSP build section
+  above) - reasoned through and fixed, not yet re-verified on hardware

@@ -65,19 +65,36 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           curl -sL "https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-devel-2.30.9-VC.zip" -o sdl2.zip
-          7z x sdl2.zip -oC:\SDL2dev
+          Expand-Archive -Path sdl2.zip -DestinationPath C:\SDL2dev -Force
           echo "SDL2_DIR=C:\SDL2dev\SDL2-2.30.9\cmake" >> $env:GITHUB_ENV
+          echo "CMAKE_PREFIX_PATH=C:\SDL2dev\SDL2-2.30.9" >> $env:GITHUB_ENV
+        # Expand-Archive is a built-in PowerShell cmdlet (unlike 7z, it
+        # needs nothing pre-installed on the runner). SDL2_DIR and
+        # CMAKE_PREFIX_PATH are both standard CMake find_package hints -
+        # setting both gives two independent ways for it to succeed.
 
-      - name: Configure
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: cmake -B build-desktop -DCMAKE_BUILD_TYPE=Release -DSDL2_DIR="C:\SDL2dev\SDL2-2.30.9\cmake"
+
+      - name: Configure (Linux/macOS)
+        if: runner.os != 'Windows'
         run: cmake -B build-desktop -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build-desktop --config Release
+
+      - name: Copy SDL2.dll next to the exe (Windows)
+        if: runner.os == 'Windows'
+        run: Copy-Item C:\SDL2dev\SDL2-2.30.9\lib\x64\SDL2.dll build-desktop\Release\SDL2.dll
+        # Without this the exe links fine but won't run when downloaded -
+        # Windows has no equivalent of an installed system SDL2 to fall
+        # back on the way Linux/macOS do.
 
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.os }}
           path: |
             build-desktop/mtd2_desktop*
-            build-desktop/**/*.dll
+            build-desktop/Release/*
           if-no-files-found: ignore

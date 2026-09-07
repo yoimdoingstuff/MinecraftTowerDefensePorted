@@ -22,7 +22,8 @@ void game_init(Game *g, int map_index) {
     map_load_into_grid(map_index, &g->grid);
     tower_set_init(&g->towers);
     enemy_set_init(&g->enemies);
-    wave_manager_init(&g->wave, MAP_DEFS[map_index].total_waves);
+    wave_manager_init(&g->wave, MAP_DEFS[map_index].total_waves,
+                       MAP_DEFS[map_index].boss_kind, MAP_DEFS[map_index].boss_wave);
 
     /* Starting currency/lives are NOT extracted values - the original's
      * exact starting numbers weren't pinned down in this pass. 300
@@ -95,13 +96,16 @@ void game_handle_input(Game *g, const PlatformInput *input, float dt) {
 /* Finds the nearest enemy in front of a tower along whichever cardinal
  * direction(s) touch the lane, honoring range and line-of-sight
  * (a non-path tile in the way shortens that direction's effective
- * range - matches the extracted restrict_range() behavior). */
+ * range - matches the extracted restrict_range() behavior). Range is
+ * adjusted by the tower type's current tier (see tower.h). */
 static int find_target_for_tower(const Game *g, const Tower *t) {
     static const int dirs[4][2] = {{1,0},{-1,0},{0,1},{0,-1}};
     float tower_cx = (t->tile_x + 0.5f) * TILE_SIZE;
     float tower_cy = (t->tile_y + 0.5f) * TILE_SIZE;
     const TowerDef *def = &TOWER_DEFS[t->kind];
-    float range_px = def->range * TILE_SIZE;
+    int tier = tower_tier_for_kills(g->tower_lifetime_kills[t->kind]);
+    float tier_range = def->range * tower_tier_range_mult(tier);
+    float range_px = tier_range * TILE_SIZE;
 
     int best_id = -1;
     float best_along = 1e9f;
@@ -111,7 +115,7 @@ static int find_target_for_tower(const Game *g, const Tower *t) {
         if (!grid_path_adjacent(&g->grid, t->tile_x, t->tile_y, dx, dy)) continue;
 
         float effective_range = range_px;
-        int steps = (int)def->range + 1;
+        int steps = (int)tier_range + 1;
         for (int s = 1; s <= steps; s++) {
             int tx = t->tile_x + dx * s;
             int ty = t->tile_y + dy * s;
@@ -157,7 +161,9 @@ void game_update(Game *g, float dt) {
         if (!target) continue;
 
         const TowerDef *def = &TOWER_DEFS[t->kind];
-        int dmg = (int)(def->power + 0.999f); /* round up: fractional power still does >=1 */
+        int tier = tower_tier_for_kills(g->tower_lifetime_kills[t->kind]);
+        float effective_power = def->power * tower_tier_power_mult(tier);
+        int dmg = (int)(effective_power + 0.999f); /* round up: fractional power still does >=1 */
         target->hp -= dmg;
         t->cooldown = 1.0f / def->firerate;
         t->fire_flash = 0.15f;
@@ -167,6 +173,7 @@ void game_update(Game *g, float dt) {
         if (target->hp <= 0) {
             target->alive = 0;
             g->currency += ENEMY_DEFS[target->kind].reward;
+            g->tower_lifetime_kills[t->kind]++;
             resolved_this_frame++;
         }
     }

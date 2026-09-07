@@ -22,6 +22,7 @@ static PlatformTexture *tex_for_tile(const Assets *a, TileType t) {
 void render_game(const Game *g, const Assets *a) {
     platform_clear(18, 18, 24);
 
+    const MapDef *map = &MAP_DEFS[g->map_index];
     for (int y = 0; y < g->grid.height; y++) {
         for (int x = 0; x < g->grid.width; x++) {
             TileType t = g->grid.tiles[y][x];
@@ -31,11 +32,28 @@ void render_game(const Game *g, const Assets *a) {
             platform_draw_texture(tex_for_tile(a, t), px, py);
         }
     }
+    /* Per-map mood tint: a translucent wash over the ground only (not
+     * towers/enemies/UI), so maps read as visually distinct without
+     * destroying the buildable-vs-path color distinction the way
+     * multiplying each tile's own texture by the tint did (tried
+     * that first - it can only darken a colored texture, never shift
+     * its hue, and it flattened buildable/path into the same cast). */
+    if (map->tile_tint_r != 255 || map->tile_tint_g != 255 || map->tile_tint_b != 255) {
+        platform_draw_rect(0, 0, g->grid.width * TILE_SIZE, g->grid.height * TILE_SIZE,
+                            map->tile_tint_r, map->tile_tint_g, map->tile_tint_b, 60);
+    }
 
     if (g->status == GAME_PLAYING) {
         int px, py;
         grid_tile_to_pixel(g->cursor_x, g->cursor_y, &px, &py);
-        platform_draw_texture(a->cursor, px, py);
+        int can_place = grid_is_buildable(&g->grid, g->cursor_x, g->cursor_y) &&
+                         !tower_set_occupied(&g->towers, g->cursor_x, g->cursor_y) &&
+                         g->currency >= g->next_cost[g->selected_tower];
+        if (can_place) {
+            platform_draw_texture(a->cursor, px, py);
+        } else {
+            platform_draw_texture_tinted(a->cursor, px, py, 255, 90, 90);
+        }
     }
 
     for (int i = 0; i < g->towers.count; i++) {
@@ -46,6 +64,14 @@ void render_game(const Game *g, const Assets *a) {
         platform_draw_texture(a->tower_tex[t->kind], px, py);
         if (t->fire_flash > 0.0f) {
             platform_draw_rect(px, py, TILE_SIZE, TILE_SIZE, 255, 255, 255, 90);
+        }
+        int tier = tower_tier_for_kills(g->tower_lifetime_kills[t->kind]);
+        if (tier > 5) tier = 5; /* provably true already, just satisfies -Wformat-truncation */
+        if (tier > 1) {
+            char tierbuf[8];
+            snprintf(tierbuf, sizeof tierbuf, "%d", tier);
+            platform_draw_rect(px + TILE_SIZE - 11, py + TILE_SIZE - 11, 11, 11, 20, 20, 20, 210);
+            draw_text_upper(px + TILE_SIZE - 9, py + TILE_SIZE - 9, tierbuf, 255, 220, 90);
         }
     }
 
@@ -100,10 +126,16 @@ void render_game(const Game *g, const Assets *a) {
     }
 
     const TowerDef *sel = &TOWER_DEFS[g->selected_tower];
+    int sel_tier = tower_tier_for_kills(g->tower_lifetime_kills[g->selected_tower]);
+    /* Shorter name cap when the "Tn" suffix is present too, so the
+     * worst case (e.g. "ENDERPEARL" + "2500" + "T5") still fits the
+     * ~150px budget between here and the screen edge. */
     char short_name[8];
-    strncpy(short_name, sel->name, 7);
-    short_name[7] = '\0';
-    snprintf(buf, sizeof buf, "%s %d", short_name, g->next_cost[g->selected_tower]);
+    int name_cap = (sel_tier > 1) ? 4 : 7;
+    strncpy(short_name, sel->name, name_cap);
+    short_name[name_cap] = '\0';
+    if (sel_tier > 1) snprintf(buf, sizeof buf, "%s %d T%d", short_name, g->next_cost[g->selected_tower], sel_tier);
+    else snprintf(buf, sizeof buf, "%s %d", short_name, g->next_cost[g->selected_tower]);
     draw_text_upper(330, grid_h_px + 4, buf, 200, 200, 255);
     draw_text_upper(330, grid_h_px + 18, "R:WAVE", 140, 140, 160);
 

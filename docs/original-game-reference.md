@@ -88,3 +88,66 @@ Wave 50 is a tracked challenge/achievement threshold in survival modes.
   usually don't. Cross-referencing which raw bitmap belongs to which named
   sprite would take shape/placement-tag parsing we haven't done yet — worth
   doing later if a specific tower/enemy's exact art is needed.
+
+## Update: real sprite matching (towers done, most enemies not)
+
+The cross-referencing mentioned above turned out to be tractable: walk a
+named symbol's `DefineSprite` nested tag stream for `PlaceObject2/3`
+`CharacterId` references (recursing through child sprites), then for any
+`DefineShape*` reached that way, scan its fill-style bytes for a
+`0x40-0x43` (bitmap fill) type byte followed by a 2-byte little-endian ID
+that matches a real extracted bitmap. This is a byte-scan heuristic, not a
+full SWF shape-record parser (it doesn't walk the bit-packed fill-style
+array structurally) — it worked cleanly in practice because false
+positives are self-rejecting (the candidate ID has to actually exist in
+the bitmap set), but a shape with unusual fill data could in principle
+still be missed or mismatched.
+
+**Result: all 9 towers resolved to a single clean, correct 40x40 image**
+(e.g. arrow_dispenser#327 → 326 → shapes {323,325} → bitmaps {322,324},
+and 324 is visibly a dispenser block with an arrow icon). These are now
+in `assets/images/tower_*.png`, replacing the placeholders.
+
+**Most enemies did NOT resolve cleanly.** zombie/skeleton/spider/
+cave_spider/silverfish/zombie_pig/blaze/spider_jockey/enderman each
+resolve to a single small fragment (e.g. zombie_character#474 → three
+28x22 pieces) — these are Minecraft-style mobs built from separately-
+animated body parts (head/body/limbs), and the resolver finds one limb,
+not a composited whole character. Using the raw fragment would look
+broken, not better than a placeholder, so those 9 still use generated
+placeholder art. **Five enemies did resolve to one complete, correct
+image**: creeper, ghast, magma cube, slime, and Herobrine (his is a
+40x40 icon, not an in-game animation frame, but it's a real, clean, boss-
+appropriate image) — these now use the real asset too.
+
+Compositing the articulated enemies properly would mean: find the
+parent clip's per-child `PlaceObject` MATRIX (position/rotation) for
+each limb, render each limb bitmap through its own matrix, and pick (or
+render) a representative animation frame — meaningfully more work than
+the towers, not attempted this pass.
+
+## Update: engine now covers more of the real roster
+
+Since the first pass (6 enemies, 3 maps, no tiers), the engine added:
+- All 14 hostile enemy types from the table above (was 6) — Wolf and
+  Snow Golem still excluded (they're player-summonable allies, a
+  different mechanic, not implemented).
+- 6 more maps (was 3): Ice Peak, Abandoned Mine, Spider Cavern, Deserted
+  Beach, Mountain Ascent, Nether Stronghold — same honesty caveat as
+  the first 3 (original layouts using the confirmed mechanic, not
+  extracted tile-for-tile).
+- Herobrine as a one-time boss wave (final wave of Nether Stronghold
+  only) — which map/wave gets him is a design choice made for the port,
+  not an extracted fact about the original.
+- The tier 1-5 system: implemented using arrow's confirmed thresholds
+  (100/250/500/1000 kills) applied to every tower type (assumption, see
+  Core Loop above), with a stat bonus of +15% power / +10% range per
+  tier above 1 — that bonus formula is an original design choice, not
+  extracted, since the original's exact tier bonus was never traced.
+  Kills are tracked in memory only (reset each run) — persisting them
+  needs a save file, not added yet.
+- Per-map mood tinting (a translucent color wash over the ground, not a
+  per-tile multiply — multiplying an already-green/tan tile texture by
+  a tint color can only darken it, never shift its hue, and it was
+  flattening the buildable-vs-path color distinction) so the 9 maps
+  read as visually distinct despite sharing the same two tile textures.

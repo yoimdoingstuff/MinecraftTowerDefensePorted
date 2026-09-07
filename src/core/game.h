@@ -31,6 +31,10 @@ typedef struct {
      * see docs/original-game-reference.md). */
     int next_cost[TOWER_COUNT];
 
+    /* Lifetime kills per tower type, driving the tier 1-5 system (see
+     * tower.h). In-memory only - resets each run, not saved yet. */
+    int tower_lifetime_kills[TOWER_COUNT];
+
     float speed_multiplier;   /* 1.0 normal, 2.0 after speed-toggle */
     int shots_fired_this_frame; /* reset each game_update() call; backends
                                     use this to trigger the fire sound once

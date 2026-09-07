@@ -3,12 +3,20 @@
 #include <math.h>
 
 const EnemyDef ENEMY_DEFS[ENEMY_COUNT] = {
-    [ENEMY_ZOMBIE]      = {"Zombie",      "images/enemy_zombie.png",      0.6f, 0, 10},
-    [ENEMY_SKELETON]    = {"Skeleton",    "images/enemy_skeleton.png",    0.6f, 0, 10},
-    [ENEMY_SPIDER]      = {"Spider",      "images/enemy_spider.png",      1.0f, 0, 10},
-    [ENEMY_CREEPER]     = {"Creeper",     "images/enemy_creeper.png",     0.5f, 0, 10},
-    [ENEMY_CAVE_SPIDER]  = {"Cave Spider", "images/enemy_cave_spider.png", 1.1f, 0, 10},
-    [ENEMY_SILVERFISH]  = {"Silverfish",  "images/enemy_silverfish.png",  0.8f, 0, 10},
+    [ENEMY_ZOMBIE]       = {"Zombie",       "images/enemy_zombie.png",       0.6f, 0,   10,  0},
+    [ENEMY_SKELETON]     = {"Skeleton",     "images/enemy_skeleton.png",     0.6f, 0,   10,  0},
+    [ENEMY_SPIDER]       = {"Spider",       "images/enemy_spider.png",       1.0f, 0,   10,  0},
+    [ENEMY_CREEPER]      = {"Creeper",      "images/enemy_creeper.png",      0.5f, 0,   10,  0},
+    [ENEMY_CAVE_SPIDER]  = {"Cave Spider",  "images/enemy_cave_spider.png",  1.1f, 0,   10,  0},
+    [ENEMY_SILVERFISH]   = {"Silverfish",   "images/enemy_silverfish.png",   0.8f, 0,   10,  0},
+    [ENEMY_ZOMBIE_PIG]   = {"Zombie Pig",   "images/enemy_zombie_pig.png",   0.7f, 0,   10,  0},
+    [ENEMY_BLAZE]        = {"Blaze",        "images/enemy_blaze.png",        0.6f, 0,   10,  0},
+    [ENEMY_GHAST]        = {"Ghast",        "images/enemy_ghast.png",        0.4f, 0,   10,  0},
+    [ENEMY_MAGMA]        = {"Magma Cube",   "images/enemy_magma.png",        0.3f, 0,   10,  0},
+    [ENEMY_SLIME]        = {"Slime",        "images/enemy_slime.png",        0.3f, 0,   10,  0},
+    [ENEMY_SPIDER_JOCKEY]= {"Spider Jockey","images/enemy_spider_jockey.png",1.0f, 0,   10,  0},
+    [ENEMY_ENDERMAN]     = {"Enderman",     "images/enemy_enderman.png",     4.0f, 0,   10,  0},
+    [ENEMY_HEROBRINE]    = {"Herobrine",    "images/enemy_herobrine.png",    0.6f, 750, 500, 1},
 };
 
 void enemy_set_init(EnemySet *es) {
